@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mapa de Corinthius — Protótipo</title>
+<style>
+:root{--bg:#f6f1e7;--card:#fffdf8;--tx:#2a2118;--mut:#7a6c58;--bd:#d9ccb4;--water:#9cc7dc;--street:#efe6d2;--land:#e3d8bd;--ac:#8a2b2b;--c-casa:#4f8a5b;--c-castelo:#8a2b2b;--c-terreno:#b8923a;--c-apto:#3f6fa3;--c-hotel:#7b4f9e;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1a1712;--card:#242018;--tx:#f0e8d8;--mut:#a89a82;--bd:#3d3628;--water:#2b4a5c;--street:#3a3427;--land:#2f2a1f;--ac:#d96a6a}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.45 Georgia,'Times New Roman',serif}
+main{max-width:900px;margin:0 auto;padding:14px}
+h1{font-size:1.4rem;margin:0 0 2px}
+.sub{color:var(--mut);margin:0 0 12px;font-size:.9rem}
+.filters{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px}
+.filters button{flex:none;border:1px solid var(--bd);background:var(--card);color:var(--tx);border-radius:20px;padding:6px 12px;font:inherit;font-size:.85rem;cursor:pointer}
+.filters button.on{background:var(--ac);color:#fff;border-color:var(--ac)}
+.map{background:var(--card);border:1px solid var(--bd);border-radius:10px;margin-top:8px;overflow:hidden}
+svg{display:block;width:100%;height:auto}
+.lot{stroke:var(--tx);stroke-width:1;cursor:pointer;opacity:.9}
+.lot:hover,.lot.sel{opacity:1;stroke-width:3}
+.lot.off{opacity:.12;pointer-events:none}
+.lot.busy{fill:#9a9a9a!important;cursor:not-allowed}
+text{font:11px Georgia,serif;fill:var(--mut);pointer-events:none}
+.panel{background:var(--card);border:1px solid var(--bd);border-radius:10px;margin-top:12px;padding:14px}
+.tag{display:inline-block;color:#fff;border-radius:4px;padding:1px 8px;font-size:.75rem}
+.price{font-size:1.2rem;color:var(--ac);font-weight:bold}
+label{display:block;font-size:.85rem;margin-top:10px;color:var(--mut)}
+input,select,textarea{width:100%;padding:9px;border:1px solid var(--bd);border-radius:6px;background:var(--bg);color:var(--tx);font:inherit}
+.go{margin-top:14px;width:100%;padding:12px;border:0;border-radius:8px;background:var(--ac);color:#fff;font:inherit;font-weight:bold;cursor:pointer}
+pre{white-space:pre-wrap;background:var(--bg);border:1px dashed var(--bd);border-radius:6px;padding:10px;font-size:.85rem}
+.leg{display:flex;flex-wrap:wrap;gap:10px;font-size:.8rem;color:var(--mut);margin-top:8px}
+.leg i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px}
+.note{font-size:.8rem;color:var(--mut);margin-top:12px}
+</style>
+</head>
+<body>
+<main>
+<h1>Corinthius — Mapa de Imóveis</h1>
+<p class="sub">Capital do Império · toque em um imóvel para ver detalhes e enviar requerimento</p>
+<div class="filters" id="flt"></div>
+<div class="map">
+<svg viewBox="0 0 600 400" role="img" aria-label="Mapa da cidade de Corinthius">
+<rect width="600" height="400" fill="var(--land)"/>
+<path d="M0 300 C120 270 220 330 330 300 S520 290 600 320 L600 400 L0 400Z" fill="var(--water)"/>
+<text x="250" y="365">Baía de Corinthius</text>
+<g fill="var(--street)"><rect x="0" y="120" width="600" height="14"/><rect x="0" y="215" width="600" height="14"/><rect x="150" y="0" width="14" height="300"/><rect x="330" y="0" width="14" height="300"/><rect x="470" y="0" width="14" height="300"/></g>
+<text x="8" y="130">Av. do Basileus</text><text x="8" y="225">Rua das Pérolas</text>
+<g id="lots"></g>
+</svg>
+</div>
+<div class="leg" id="leg"></div>
+<div class="panel" id="panel"><b>Nenhum imóvel selecionado.</b><br><span class="sub">Escolha um lote no mapa.</span></div>
+<p class="note">Protótipo demonstrativo: imóveis, preços e nomes são fictícios. Na versão final, o requerimento chega por e-mail e/ou planilha, e o administrador gerencia os imóveis em um painel.</p>
+</main>
+<script>
+var T={casa:['Casa','var(--c-casa)'],castelo:['Castelo','var(--c-castelo)'],terreno:['Terreno','var(--c-terreno)'],apto:['Apartamento','var(--c-apto)'],hotel:['Hotel','var(--c-hotel)']};
+var L=[
+{id:'C-01',t:'castelo',n:'Castelo de Pérola Negra',x:20,y:20,w:120,h:85,p:'8.000/mês',m:'alugar'},
+{id:'H-01',t:'casa',n:'Casa Jardim',x:175,y:30,w:60,h:70,p:'600/mês',m:'alugar'},
+{id:'H-02',t:'casa',n:'Casa do Porto',x:245,y:30,w:60,h:70,p:'550/mês',m:'alugar',busy:1},
+{id:'T-01',t:'terreno',n:'Terreno Norte',x:360,y:25,w:90,h:80,p:'4.500',m:'comprar'},
+{id:'A-01',t:'apto',n:'Edifício Ágora',x:500,y:20,w:80,h:85,p:'350/mês',m:'alugar'},
+{id:'T-02',t:'terreno',n:'Terreno da Colina',x:20,y:150,w:120,h:50,p:'3.800',m:'comprar'},
+{id:'HT-01',t:'hotel',n:'Hotel Odissea',x:175,y:145,w:130,h:55,p:'120/diária',m:'alugar'},
+{id:'A-02',t:'apto',n:'Residencial Eolo',x:360,y:150,w:90,h:50,p:'320/mês',m:'alugar'},
+{id:'T-03',t:'terreno',n:'Terreno Leste',x:500,y:150,w:80,h:50,p:'3.200',m:'comprar',busy:1},
+{id:'H-03',t:'casa',n:'Casa da Praça',x:20,y:245,w:90,h:45,p:'500/mês',m:'alugar'},
+{id:'T-04',t:'terreno',n:'Terreno Beira-mar',x:175,y:245,w:110,h:40,p:'5.200',m:'comprar'},
+{id:'HT-02',t:'hotel',n:'Pousada do Farol',x:360,y:245,w:90,h:40,p:'80/diária',m:'alugar'}];
+var cur=null,flt='todos',$=function(i){return document.getElementById(i)};
+function draw(){var g=$('lots');g.innerHTML='';L.forEach(function(l){
+var r=document.createElementNS('http://www.w3.org/2000/svg','rect');
+['x','y','width:w','height:h'].forEach(function(k){var a=k.split(':');r.setAttribute(a[0],l[a[1]||a[0]])});
+r.setAttribute('rx',4);r.setAttribute('fill',T[l.t][1]);
+r.setAttribute('class','lot'+(l.busy?' busy':'')+(flt!='todos'&&flt!=l.t?' off':'')+(cur&&cur.id==l.id?' sel':''));
+if(!l.busy)r.onclick=function(){cur=l;draw();show(l)};
+g.appendChild(r);
+var t=document.createElementNS('http://www.w3.org/2000/svg','text');
+t.setAttribute('x',l.x+5);t.setAttribute('y',l.y+16);t.style.fill='#fff';t.textContent=l.id+(l.busy?' ✕':'');g.appendChild(t)})}
+function show(l){$('panel').innerHTML='<span class="tag" style="background:'+T[l.t][1]+'">'+T[l.t][0]+'</span> <b>'+l.n+'</b> <small>('+l.id+')</small><div class="price">◈ '+l.p+'</div>'+
+'<form id="f"><label>Nome / título micronacional<input id="nm" required></label><label>E-mail<input id="em" type="email" required></label>'+
+'<label>Tipo de requerimento<select id="tp"><option>'+(l.m=='comprar'?'Compra':'Aluguel')+'</option></select></label>'+
+'<label>Observações<textarea id="ob" rows="3"></textarea></label><button class="go">Enviar requerimento</button></form><div id="out"></div>';
+$('f').onsubmit=function(e){e.preventDefault();var s='REQUERIMENTO — '+l.n+' ('+l.id+')\nTipo: '+$('tp').value+'\nValor: ◈ '+l.p+'\nRequerente: '+$('nm').value+'\nE-mail: '+$('em').value+'\nObs.: '+($('ob').value||'—');
+$('out').innerHTML='<p><b>Requerimento registrado (simulação).</b></p><pre id="tx"></pre><button class="go" id="cp">Copiar texto</button>';
+$('tx').textContent=s;$('cp').onclick=function(){try{navigator.clipboard.writeText(s);this.textContent='Copiado!'}catch(x){}}};
+$('panel').scrollIntoView({behavior:'smooth',block:'nearest'})}
+var F=['todos'].concat(Object.keys(T));
+F.forEach(function(k){var b=document.createElement('button');b.textContent=k=='todos'?'Todos':T[k][0];if(k=='todos')b.className='on';
+b.onclick=function(){flt=k;[].forEach.call($('flt').children,function(c){c.className=''});b.className='on';draw()};$('flt').appendChild(b)});
+$('leg').innerHTML=Object.keys(T).map(function(k){return '<span><i style="background:'+T[k][1]+'"></i>'+T[k][0]+'</span>'}).join('')+'<span><i style="background:#9a9a9a"></i>Ocupado ✕</span>';
+draw();
+</script>
+</body>
+</html>
